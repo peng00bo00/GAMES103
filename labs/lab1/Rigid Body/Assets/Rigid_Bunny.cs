@@ -83,21 +83,45 @@ public class Rigid_Bunny : MonoBehaviour
 			launched=true;
 		}
 
-		// Part I: Update velocities
+		if (!launched) return;
 
+		// Part I: Update velocities
+		Vector3 g = new Vector3(0, -9.8f, 0);
+		v = v + g * dt;
+
+		// Velocities decay
+		v = linear_decay * v;
+		w = angular_decay * w;
 
 		// Part II: Collision Impulse
 		Collision_Impulse(new Vector3(0, 0.01f, 0), new Vector3(0, 1, 0));
 		Collision_Impulse(new Vector3(2, 0, 0), new Vector3(-1, 0, 0));
 
 		// Part III: Update position & orientation
-		//Update linear status
-		Vector3 x    = transform.position;
-		//Update angular status
+		// Update linear status
+		Vector3 x = transform.position;
+		x = x + v * dt;
+
+		// Update angular status
 		Quaternion q = transform.rotation;
+		Quaternion dq= new Quaternion(0.5f * dt * w.x, 0.5f * dt * w.y, 0.5f * dt * w.z, 0.0f);
+		dq = dq * q;
+
+		q = quaternionAdd(q, dq);
+		q = q.normalized;
 
 		// Part IV: Assign to the object
 		transform.position = x;
 		transform.rotation = q;
+	}
+
+	Quaternion quaternionAdd(Quaternion q1, Quaternion q2) {
+		Quaternion q = Quaternion.identity;
+		q.x = q1.x + q2.x;
+		q.y = q1.y + q2.y;
+		q.z = q1.z + q2.z;
+		q.w = q1.w + q2.w;
+
+		return q;
 	}
 }
