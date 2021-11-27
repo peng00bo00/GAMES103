@@ -5,10 +5,13 @@ using UnityEngine;
 public class Rigid_Bunny_by_Shape_Matching : MonoBehaviour
 {
 	public bool launched = false;
-	Vector3[] X;
-	Vector3[] Q;
-	Vector3[] V;
+	Vector3[] X; // location buffer
+	Vector3[] Q; // radius buffer
+	Vector3[] V; // velocity buffer
 	Matrix4x4 QQt = Matrix4x4.zero;
+
+	float muN = 0.5f;
+	float muT = 1.0f;
 
 
     // Start is called before the first frame update
@@ -148,13 +151,70 @@ public class Rigid_Bunny_by_Shape_Matching : MonoBehaviour
 
 			V[i]+=(x-X[i])*inv_dt;
 			X[i]=x;
-		}	
+		}
 		Mesh mesh = GetComponent<MeshFilter>().mesh;
 		mesh.vertices=X;
    	}
 
 	void Collision(float inv_dt)
 	{
+		// floor
+		Vector3 N = new Vector3(0, 1, 0);
+		Vector3 P = new Vector3(0, 0.01f, 0);
+		for (int i = 0; i < X.Length; i++)
+		{
+			Vector3 xi = X[i];
+			Vector3 vi = V[i];
+
+			// collision check
+			if (Vector3.Dot(N, xi - P) < 0) {
+				if (Vector3.Dot(N, vi) < 0) {
+					// location update
+					X[i] = xi - Vector3.Dot(N, xi - P) * N;
+
+					// velocity update
+					Vector3 viN= Vector3.Project(vi, N);
+					Vector3 viT= vi - viN;
+
+					float a = 1.0f - muT * (1.0f + muN) * viN.magnitude / viT.magnitude;
+					a = Mathf.Max(a, 0.0f);
+
+					viN = -muN * viN;
+					viT = a * viT;
+
+					V[i] = viN + viT;
+				}
+			}
+		}
+
+		// side wall
+		N = new Vector3(-1, 0, 0);
+		P = new Vector3(2, 0, 0);
+		for (int i = 0; i < X.Length; i++)
+		{
+			Vector3 xi = X[i];
+			Vector3 vi = V[i];
+
+			// collision check
+			if (Vector3.Dot(N, xi - P) < 0) {
+				if (Vector3.Dot(N, vi) < 0) {
+					// location update
+					X[i] = xi - Vector3.Dot(N, xi - P) * N;
+
+					// velocity update
+					Vector3 viN= Vector3.Project(vi, N);
+					Vector3 viT= vi - viN;
+
+					float a = 1.0f - muT * (1.0f + muN) * viN.magnitude / viT.magnitude;
+					a = Mathf.Max(a, 0.0f);
+
+					viN = -muN * viN;
+					viT = a * viT;
+
+					V[i] = viN + viT;
+				}
+			}
+		}
 	}
 
     // Update is called once per frame
@@ -162,9 +222,35 @@ public class Rigid_Bunny_by_Shape_Matching : MonoBehaviour
     {
   		float dt = 0.015f;
 
+		//Game Control
+		if(Input.GetKey("r"))
+		{
+			launched=false;
+			
+			for(int i=0; i<X.Length; i++)
+			{
+				V[i] = Vector3.zero;
+			}
+
+		}
+		if(Input.GetKey("l"))
+		{
+			launched=true;
+			
+			for(int i=0; i<X.Length; i++)
+			{
+				V[i] = new Vector3 (5, 2, 0);
+			}
+		}
+
+		if (!launched) return;
+
   		//Step 1: run a simple particle system.
-        for(int i=0; i<V.Length; i++)
+		Vector3 g = new Vector3(0, -9.8f, 0);
+        for(int i=0; i<X.Length; i++)
         {
+			V[i] += g * dt;
+			X[i] += V[i] * dt;
         }
 
         //Step 2: Perform simple particle collision.
@@ -173,9 +259,54 @@ public class Rigid_Bunny_by_Shape_Matching : MonoBehaviour
 		// Step 3: Use shape matching to get new translation c and 
 		// new rotation R. Update the mesh by c and R.
         //Shape Matching (translation)
+		Vector3 c = Vector3.zero;
+		for(int i=0; i<X.Length; i++)
+        {
+			c += X[i];
+        }
+
+		c = c / V.Length;
 		
 		//Shape Matching (rotation)
+		Matrix4x4 R = Matrix4x4.zero;
+		R[3, 3] = 1;
+
+		for(int i=0; i<X.Length; i++)
+        {
+			R = matrixAdd(R, outerProduct(X[i]-c, Q[i]));
+        }
+
+		R = R * QQt.inverse;
+		R = Get_Rotation(R);
 		
-		//Update_Mesh(c, R, 1/dt);
+		Update_Mesh(c, R, 1/dt);
     }
+
+	Matrix4x4 outerProduct(Vector3 u, Vector3 v) {
+		Matrix4x4 A = Matrix4x4.identity;
+
+		for (int i = 0; i < 3; i++)
+		{
+			for (int j = 0; j < 3; j++)
+			{
+				A[i, j] = u[i] * v[j];
+			}
+		}
+
+		return A;
+	}
+
+	Matrix4x4 matrixAdd(Matrix4x4 m1, Matrix4x4 m2) {
+		Matrix4x4 m = Matrix4x4.identity;
+
+		for (int i = 0; i < 3; i++)
+		{
+			for (int j = 0; j < 3; j++)
+			{
+				m[i, j] = m1[i, j] + m2[i, j];
+			}
+		}
+
+		return m;
+	}
 }
