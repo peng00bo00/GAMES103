@@ -154,6 +154,7 @@ public class Rigid_Bunny_by_Shape_Matching : MonoBehaviour
 		}
 		Mesh mesh = GetComponent<MeshFilter>().mesh;
 		mesh.vertices=X;
+
    	}
 
 	void Collision(float inv_dt)
@@ -226,12 +227,7 @@ public class Rigid_Bunny_by_Shape_Matching : MonoBehaviour
 		if(Input.GetKey("r"))
 		{
 			launched=false;
-			
-			for(int i=0; i<X.Length; i++)
-			{
-				V[i] = Vector3.zero;
-			}
-
+			Update_Mesh(new Vector3 (0, 0.6f, 0), Matrix4x4.Rotate(new Quaternion(0.6f, 0.0f, 0.0f, 0.8f)), 0.0f);
 		}
 		if(Input.GetKey("l"))
 		{
