@@ -162,60 +162,12 @@ public class Rigid_Bunny_by_Shape_Matching : MonoBehaviour
 		// floor
 		Vector3 N = new Vector3(0, 1, 0);
 		Vector3 P = new Vector3(0, 0.01f, 0);
-		for (int i = 0; i < X.Length; i++)
-		{
-			Vector3 xi = X[i];
-			Vector3 vi = V[i];
-
-			// collision check
-			if (Vector3.Dot(N, xi - P) < 0) {
-				if (Vector3.Dot(N, vi) < 0) {
-					// location update
-					X[i] = xi - Vector3.Dot(N, xi - P) * N;
-
-					// velocity update
-					Vector3 viN= Vector3.Project(vi, N);
-					Vector3 viT= vi - viN;
-
-					float a = 1.0f - muT * (1.0f + muN) * viN.magnitude / viT.magnitude;
-					a = Mathf.Max(a, 0.0f);
-
-					viN = -muN * viN;
-					viT = a * viT;
-
-					V[i] = viN + viT;
-				}
-			}
-		}
+		Collision_Impulse(P, N);
 
 		// side wall
 		N = new Vector3(-1, 0, 0);
 		P = new Vector3(2, 0, 0);
-		for (int i = 0; i < X.Length; i++)
-		{
-			Vector3 xi = X[i];
-			Vector3 vi = V[i];
-
-			// collision check
-			if (Vector3.Dot(N, xi - P) < 0) {
-				if (Vector3.Dot(N, vi) < 0) {
-					// location update
-					X[i] = xi - Vector3.Dot(N, xi - P) * N;
-
-					// velocity update
-					Vector3 viN= Vector3.Project(vi, N);
-					Vector3 viT= vi - viN;
-
-					float a = 1.0f - muT * (1.0f + muN) * viN.magnitude / viT.magnitude;
-					a = Mathf.Max(a, 0.0f);
-
-					viN = -muN * viN;
-					viT = a * viT;
-
-					V[i] = viN + viT;
-				}
-			}
-		}
+		Collision_Impulse(P, N);
 	}
 
     // Update is called once per frame
@@ -277,6 +229,35 @@ public class Rigid_Bunny_by_Shape_Matching : MonoBehaviour
 		
 		Update_Mesh(c, R, 1/dt);
     }
+
+	void Collision_Impulse(Vector3 P, Vector3 N) {
+
+		for (int i = 0; i < X.Length; i++)
+		{
+			Vector3 xi = X[i];
+			Vector3 vi = V[i];
+
+			// collision check
+			if (Vector3.Dot(N, xi - P) < 0) {
+				if (Vector3.Dot(N, vi) < 0) {
+					// location update
+					X[i] = xi - Vector3.Dot(N, xi - P) * N;
+
+					// velocity update
+					Vector3 viN= Vector3.Project(vi, N);
+					Vector3 viT= vi - viN;
+
+					float a = 1.0f - muT * (1.0f + muN) * viN.magnitude / viT.magnitude;
+					a = Mathf.Max(a, 0.0f);
+
+					viN = -muN * viN;
+					viT = a * viT;
+
+					V[i] = viN + viT;
+				}
+			}
+		}
+	}
 
 	Matrix4x4 outerProduct(Vector3 u, Vector3 v) {
 		Matrix4x4 A = Matrix4x4.identity;
