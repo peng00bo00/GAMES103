@@ -136,6 +136,19 @@ public class implicit_model : MonoBehaviour
 		Vector3[] X = mesh.vertices;
 		
 		//Handle colllision.
+		float r = 2.7f;
+		GameObject sphere = GameObject.Find("Sphere");
+		Vector3 c = sphere.transform.position;
+
+		for (int i = 0; i < X.Length; i++)
+		{
+			if ((X[i] - c).magnitude < r) {
+				Vector3 ri = X[i] - c;
+
+				V[i] += 1 / t * (c + r * ri.normalized - X[i]);
+				X[i] = c + r * ri.normalized;
+			}
+		}
 
 		mesh.vertices = X;
 	}
@@ -143,9 +156,28 @@ public class implicit_model : MonoBehaviour
 	void Get_Gradient(Vector3[] X, Vector3[] X_hat, float t, Vector3[] G)
 	{
 		//Momentum and Gravity.
+		float inv_t2= 1 / (t*t);
+		Vector3 g = new Vector3(0.0f, -9.8f, 0.0f);
+
+		for (int i = 0; i < G.Length; i++)
+		{
+			G[i] = inv_t2 * mass * (X[i] - X_hat[i]);
+			G[i]-= g * mass;
+		}
 		
 		//Spring Force.
-		
+		for (int e=0; e<E.Length/2; e++)
+		{
+			int i = E[e*2+0];
+			int j = E[e*2+1];
+			float Le = L[e];
+
+			Vector3 l = X[i] - X[j];
+			float l_mag = l.magnitude;
+
+			G[i] += spring_k * (1.0f - Le / l_mag) * l;
+			G[j] -= spring_k * (1.0f - Le / l_mag) * l;
+		}
 	}
 
     // Update is called once per frame
@@ -158,16 +190,47 @@ public class implicit_model : MonoBehaviour
 		Vector3[] G 		= new Vector3[X.Length];
 
 		//Initial Setup.
+		// velocity damping
+		for (int i = 0; i < X.Length; i++)
+		{
+			V[i] *= damping;
+		}
+
+		// update vertex
+		for (int i = 0; i < X.Length; i++)
+		{
+			// save previous state
+			last_X[i] = X[i];
+
+			X_hat[i] = X[i] + V[i] * t;
+			X[i] = X_hat[i];
+		}
 
 		for(int k=0; k<32; k++)
 		{
 			Get_Gradient(X, X_hat, t, G);
 			
-			//Update X by gradient.
-			
+			// Update X by gradient.
+			for (int i = 0; i < X.Length; i++)
+			{
+				float step = 1.0f / (mass / (t*t) + 4 * spring_k);
+				X[i] = X[i] - step * G[i];
+			}
 		}
 
 		//Finishing.
+		// final velocity
+		for (int i = 0; i < X.Length; i++)
+		{
+			V[i] += (X[i] - X_hat[i]) / t;
+		}
+
+		// fix the first row
+		for (int i = 0; i < 21; i++)
+		{
+			X[i] = last_X[i];
+			V[i] = Vector3.zero;
+		}
 		
 		mesh.vertices = X;
 
