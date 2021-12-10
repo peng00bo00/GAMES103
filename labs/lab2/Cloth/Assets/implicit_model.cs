@@ -7,11 +7,13 @@ public class implicit_model : MonoBehaviour
 	float 		t 		= 0.0333f;
 	float 		mass	= 1;
 	float		damping	= 0.99f;
-	float 		rho		= 0.995f;
-	float 		spring_k = 8000;
+	float 		rho		= 0.005f;
+	float 		spring_k = 10000;
 	int[] 		E;
 	float[] 	L;
 	Vector3[] 	V;
+
+	float       eps = 1.0f;
 
     // Start is called before the first frame update
     void Start()
@@ -206,15 +208,84 @@ public class implicit_model : MonoBehaviour
 			X[i] = X_hat[i];
 		}
 
-		for(int k=0; k<32; k++)
+		// // Newton's method
+		// for(int k=0; k<32; k++)
+		// {
+		// 	Get_Gradient(X, X_hat, t, G);
+			
+		// 	// Update X by gradient.
+		// 	for (int i = 0; i < X.Length; i++)
+		// 	{
+		// 		float step = 1.0f / (mass / (t*t) + 4 * spring_k);
+		// 		X[i] = X[i] - step * G[i];
+		// 	}
+		// }
+
+		// Chebyshev Acceleration
+		Vector3[] dX = new Vector3[X.Length];
+		Vector3[] old_dX = new Vector3[X.Length];
+		Vector3[] last_dX = new Vector3[X.Length];
+
+		for (int i = 0; i < X.Length; i++)
+		{
+			dX[i] = Vector3.zero;
+			old_dX[i] = Vector3.zero;
+			last_dX[i] = Vector3.zero;
+		}
+		
+		Vector3[] r = new Vector3[X.Length];
+
+		float omega = 0.0f;
+		float res;
+		float alpha = 0.9f;
+
+		// Note "A" is just an approximation of real A
+		float A = (mass / (t*t) + 4 * spring_k);
+		float inv_A = 1.0f / A;
+
+		for (int k = 0; k < 10; k++)
 		{
 			Get_Gradient(X, X_hat, t, G);
-			
-			// Update X by gradient.
+
+			// solve A dx = b with Chebyshev Acceleration
+			// A = 1 / dt^2 * M + H
+			// b = -G
+			for (int kk = 0; kk < 10; kk++)
+			{
+
+				// find residuals
+				res = 0.0f;
+				for (int i = 0; i < X.Length; i++)
+				{
+					r[i] = -G[i] - A * dX[i];
+					res += r[i].magnitude;
+				}
+
+				// Debug.Log("kk = " + kk + " res = " + res);
+
+				// stop iteration if res is small
+				if (res < eps) break;
+
+				// otherwise update gradient
+				if (kk == 0) omega = 1.0f;
+				else if (kk == 1) omega = 2 / (2 - rho*rho);
+				else omega = 4 / (4 - rho*rho*omega);
+
+				// Debug.Log("kk = " + kk + " omega0= " + omega);
+
+				for (int i = 0; i < X.Length; i++)
+				{
+					old_dX[i] = dX[i];
+					dX[i] = dX[i] + alpha * inv_A * r[i];
+					dX[i] = omega * dX[i] + (1 - omega) * last_X[i];
+					last_dX[i] = old_dX[i];
+				}
+			}
+
+			// Update X by dX
 			for (int i = 0; i < X.Length; i++)
 			{
-				float step = 1.0f / (mass / (t*t) + 4 * spring_k);
-				X[i] = X[i] - step * G[i];
+				X[i] += last_dX[i];
 			}
 		}
 
@@ -225,12 +296,11 @@ public class implicit_model : MonoBehaviour
 			V[i] += (X[i] - X_hat[i]) / t;
 		}
 
-		// fix the first row
-		for (int i = 0; i < 21; i++)
-		{
-			X[i] = last_X[i];
-			V[i] = Vector3.zero;
-		}
+		// fix two corners
+		X[0] = last_X[0];
+		V[0] = Vector3.zero;
+		X[20]= last_X[20];
+		V[20]= Vector3.zero;
 		
 		mesh.vertices = X;
 
