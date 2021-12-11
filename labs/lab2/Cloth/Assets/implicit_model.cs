@@ -8,7 +8,7 @@ public class implicit_model : MonoBehaviour
 	float 		mass	= 1;
 	float		damping	= 0.99f;
 	float 		rho		= 0.005f;
-	float 		spring_k = 10000;
+	float 		spring_k = 8000;
 	int[] 		E;
 	float[] 	L;
 	Vector3[] 	V;
