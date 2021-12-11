@@ -14,6 +14,8 @@ public class implicit_model : MonoBehaviour
 	Vector3[] 	V;
 
 	float       eps = 1.0f;
+	
+	Vector3 g = new Vector3(0.0f, -9.8f, 0.0f);
 
     // Start is called before the first frame update
     void Start()
@@ -159,7 +161,6 @@ public class implicit_model : MonoBehaviour
 	{
 		//Momentum and Gravity.
 		float inv_t2= 1 / (t*t);
-		Vector3 g = new Vector3(0.0f, -9.8f, 0.0f);
 
 		for (int i = 0; i < G.Length; i++)
 		{
@@ -192,18 +193,13 @@ public class implicit_model : MonoBehaviour
 		Vector3[] G 		= new Vector3[X.Length];
 
 		//Initial Setup.
-		// velocity damping
-		for (int i = 0; i < X.Length; i++)
-		{
-			V[i] *= damping;
-		}
-
 		// update vertex
 		for (int i = 0; i < X.Length; i++)
 		{
-			// save previous state
-			last_X[i] = X[i];
+			// skip fixed corners
+			if(i==0 || i==20)	continue;
 
+			V[i] *= damping;
 			X_hat[i] = X[i] + V[i] * t;
 			X[i] = X_hat[i];
 		}
@@ -285,6 +281,9 @@ public class implicit_model : MonoBehaviour
 			// Update X by dX
 			for (int i = 0; i < X.Length; i++)
 			{
+				// skip fixed corners
+				if(i==0 || i==20)	continue;
+
 				X[i] += last_dX[i];
 			}
 		}
@@ -295,12 +294,6 @@ public class implicit_model : MonoBehaviour
 		{
 			V[i] += (X[i] - X_hat[i]) / t;
 		}
-
-		// fix two corners
-		X[0] = last_X[0];
-		V[0] = Vector3.zero;
-		X[20]= last_X[20];
-		V[20]= Vector3.zero;
 		
 		mesh.vertices = X;
 

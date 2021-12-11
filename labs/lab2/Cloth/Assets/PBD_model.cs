@@ -9,6 +9,7 @@ public class PBD_model: MonoBehaviour {
 	float[] 	L;
 	Vector3[] 	V;
 
+	Vector3 g = new Vector3(0.0f, -9.8f, 0.0f);
 
 	// Use this for initialization
 	void Start () 
@@ -131,8 +132,44 @@ public class PBD_model: MonoBehaviour {
 		Mesh mesh = GetComponent<MeshFilter> ().mesh;
 		Vector3[] vertices = mesh.vertices;
 
+		Vector3[] sum = new Vector3[vertices.Length];
+		int[] cnt = new int[vertices.Length];
+
 		//Apply PBD here.
 		//...
+		for (int i = 0; i < vertices.Length; i++)
+		{
+			sum[i] = Vector3.zero;
+		}
+
+		for (int e=0; e<E.Length/2; e++)
+		{
+			int i = E[e*2+0];
+			int j = E[e*2+1];
+			float Le = L[e];
+
+			Vector3 Xi = vertices[i];
+			Vector3 Xj = vertices[j];
+			Vector3 l = Xi - Xj;
+
+			sum[i] += 0.5f * (Xi + Xj + Le * l.normalized);
+			sum[j] += 0.5f * (Xi + Xj - Le * l.normalized);
+
+			cnt[i]++;
+			cnt[j]++;
+		}
+
+		// update vertices
+		for (int i = 0; i < vertices.Length; i++)
+		{
+			// skip fixed corners
+			if(i==0 || i==20)	continue;
+
+			Vector3 x = (0.2f * vertices[i] + sum[i]) / (0.2f + cnt[i]);
+			V[i] += 1 / t * (x - vertices[i]);
+			vertices[i] = x;
+		}
+
 		mesh.vertices = vertices;
 	}
 
@@ -143,6 +180,20 @@ public class PBD_model: MonoBehaviour {
 		
 		//For every vertex, detect collision and apply impulse if needed.
 		//...
+		float r = 2.7f;
+		GameObject sphere = GameObject.Find("Sphere");
+		Vector3 c = sphere.transform.position;
+
+		for (int i = 0; i < X.Length; i++)
+		{
+			if ((X[i] - c).magnitude < r) {
+				Vector3 ri = X[i] - c;
+
+				V[i] += 1 / t * (c + r * ri.normalized - X[i]);
+				X[i] = c + r * ri.normalized;
+			}
+		}
+
 		mesh.vertices = X;
 	}
 
@@ -156,7 +207,10 @@ public class PBD_model: MonoBehaviour {
 		{
 			if(i==0 || i==20)	continue;
 			//Initial Setup
-			//...
+			V[i] *= damping;
+			V[i] += g * t;
+
+			X[i] += V[i] * t;
 		}
 		mesh.vertices = X;
 
