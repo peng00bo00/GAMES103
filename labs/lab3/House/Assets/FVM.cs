@@ -6,9 +6,9 @@ using System.IO;
 
 public class FVM : MonoBehaviour
 {
-	float dt 			= 0.001f;
+	float dt 			= 0.002f;
     float mass 			= 1;
-	float stiffness_0	= 20000.0f;
+	float stiffness_0	= 10000.0f;
     float stiffness_1 	= 5000.0f;
     float damp			= 0.999f;
 
@@ -287,10 +287,19 @@ public class FVM : MonoBehaviour
 
 		for (int tet=0; tet<tet_number; tet++)
 		{
+			Vector3 v = Vector3.zero;
+
+			// take sum of the vertice velocity
 			for (int i = 0; i < 4; i++)
 			{
-				V_sum[Tet[tet*4+i]] += V[Tet[tet*4+i]];
-				V_num[Tet[tet*4+i]] += 1;
+				v += V[Tet[tet*4+i]];
+			}
+
+			// add to each vertex
+			for (int i = 0; i < 4; i++)
+			{
+				V_sum[Tet[tet*4+i]] += v;
+				V_num[Tet[tet*4+i]] += 4;
 			}
 		}
 
