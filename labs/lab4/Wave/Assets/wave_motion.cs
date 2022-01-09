@@ -18,9 +18,26 @@ public class wave_motion : MonoBehaviour
 	float[,]	cg_Ap;
 	bool 	tag=true;
 
-	Vector3 	cube_v = Vector3.zero;
-	Vector3 	cube_w = Vector3.zero;
+	float dt = 0.003f;
 
+	Vector3 	cube_v1 = Vector3.zero;
+	Vector3 	cube_v2 = Vector3.zero;
+
+	Vector3 	cube_w1 = Vector3.zero;
+	Vector3 	cube_w2 = Vector3.zero;
+	
+	// raycasting direction	
+	Vector3 dir    = new Vector3(0.0f, 1.0f, 0.0f);
+
+	// dA
+	float dA = 0.01f;
+
+	float rho_w = 1.0f;
+	float rho_b = 0.5f;
+
+	float L, V, m, I_inv;
+
+	Vector3 g = new Vector3(0.0f,-9.8f, 0.0f);
 
 	// Use this for initialization
 	void Start () 
@@ -72,6 +89,16 @@ public class wave_motion : MonoBehaviour
 			old_h[i,j]=0;
 			vh[i,j]=0;
 		}
+
+		GameObject block1 = GameObject.Find("Block");
+
+		// hard code some geometries
+		L = 1.0f;
+		V = L * L * L;
+		m = rho_b * V;
+		// I is a constant for a cube
+		float I = m * L * L / 6.0f;
+		I_inv = 1.0f / I;
 	}
 
 	void A_Times(bool[,] mask, float[,] x, float[,] Ax, int li, int ui, int lj, int uj)
@@ -163,39 +190,73 @@ public class wave_motion : MonoBehaviour
 		//TODO: Solve the Poisson equation to obtain vh (virtual height).
 		GameObject block1 = GameObject.Find("Block");
 		Bounds bbox1 = block1.GetComponent<Renderer>().bounds;
+		Vector3 F1 = Vector3.zero + rho_b * g;
+		Vector3 T1 = Vector3.zero;
+
+		Quaternion q1 = block1.transform.rotation;
+		Matrix4x4 R1 = Matrix4x4.Rotate(q1);
 
 		//TODO: for block 2, calculate low_h.
 		//TODO: then set up b and cg_mask for conjugate gradient.
 		//TODO: Solve the Poisson equation to obtain vh (virtual height).
 		GameObject block2 = GameObject.Find("Cube");
 		Bounds bbox2 = block2.GetComponent<Renderer>().bounds;
+		Vector3 F2 = Vector3.zero + rho_b * g * 1.0f;
+		Vector3 T2 = Vector3.zero;
+
+		Quaternion q2 = block2.transform.rotation;
+		Matrix4x4 R2 = Matrix4x4.Rotate(q2);
 
 		for (int i=0; i<size; i++) {
 			for (int j=0; j<size; j++) {
+				vh[i, j] = 0;
+				cg_mask[i, j] = !tag;
+
 				float x = i*0.1f-size*0.05f;
 				float z = j*0.1f-size*0.05f;
 				
-				Vector3 origin = new Vector3(x, 0.0f, z);
+				Vector3 p = new Vector3(x, new_h[i, j], z);
+				
+				Vector3 origin = new Vector3(x,-1.0f, z);
+				Ray ray = new Ray(origin, dir);
+				RaycastHit hit;
 
-				if (bbox1.Contains(origin)) {
-					low_h[i, j] = h[i, j] - 0.1f;
+				if (bbox1.Contains(p)) {
+					if (block1.GetComponent<Collider>().Raycast(ray, out hit, 10.0f)) {
+						low_h[i, j] = hit.distance-1.0f;
 
-					cg_mask[i, j] = tag;
-					b[i, j] = (new_h[i, j] - low_h[i, j]) / rate;
-				} else if (bbox2.Contains(origin)) {
-					low_h[i, j] = h[i, j] - 0.1f;
+						if (low_h[i, j] < new_h[i, j]) {
+							cg_mask[i, j] = tag;
+							b[i, j] = (new_h[i, j] - low_h[i, j]) / rate;
 
-					cg_mask[i, j] = tag;
-					b[i, j] = (new_h[i, j] - low_h[i, j]) / rate;
-				} else {
-					vh[i, j] = 0;
-					cg_mask[i, j] = !tag;
+							// force and torque
+							Vector3 f1 = rho_w * g * low_h[i, j] * dA;
+							F1 += f1;
+
+							Vector3 r = new Vector3(x, low_h[i, j], z);
+							r = r - block1.transform.position;
+							T1 += Vector3.Cross(r, f1);
+						}
+					}
+				} else if (bbox2.Contains(p)) {
+					if (block2.GetComponent<Collider>().Raycast(ray, out hit, 10.0f)) {
+						low_h[i, j] = hit.distance-1.0f;
+
+						if (low_h[i, j] < new_h[i, j]) {
+							cg_mask[i, j] = tag;
+							b[i, j] = (new_h[i, j] - low_h[i, j]) / rate;
+
+							// force and torque
+							Vector3 f2 = rho_w * g * low_h[i, j] * dA;
+							F2 += f2;
+
+							Vector3 r = new Vector3(x, low_h[i, j], z);
+							r = r - block2.transform.position;
+							T2 += Vector3.Cross(r, f2);
+						}
+					}
 				}
 
-				// Vector3 dir    = new Vector3(0.0f, 1.0f, 0.0f);
-				
-				// Ray ray = new Ray(origin, dir);
-				// Physics.Raycast(origin, dir);
 			}
 		}
 		
@@ -230,6 +291,37 @@ public class wave_motion : MonoBehaviour
 
 		//Step 4: Water->Block coupling.
 		//More TODO here.
+		// block1 velocity
+		cube_v1 += F1 / m * dt;
+		block1.transform.position += cube_v1 * dt;
+		cube_v1 *= damping;
+
+		// block1 angular velocity
+		cube_w1 += T1 * I_inv * dt;
+		Quaternion dq1= new Quaternion(0.5f * dt * cube_w1.x, 0.5f * dt * cube_w1.y, 0.5f * dt * cube_w1.z, 0.0f);
+		dq1 = dq1 * q1;
+
+		q1 = quaternionAdd(q1, dq1);
+		q1 = q1.normalized;
+		block1.transform.rotation = q1;
+
+		cube_w1 *= damping;
+
+		// block2 velocity
+		cube_v2 += F2 / m * dt;
+		block2.transform.position += cube_v2 * dt;
+		cube_v2 *= damping;
+
+		// block2 angular velocity
+		cube_w2 += T2 * I_inv * dt;
+		Quaternion dq2= new Quaternion(0.5f * dt * cube_w2.x, 0.5f * dt * cube_w2.y, 0.5f * dt * cube_w2.z, 0.0f);
+		dq2 = dq2 * q2;
+
+		q2 = quaternionAdd(q2, dq2);
+		q2 = q2.normalized;
+		block2.transform.rotation = q2;
+
+		cube_w2 *= damping;
 	}
 	
 
@@ -278,5 +370,15 @@ public class wave_motion : MonoBehaviour
 
 		mesh.vertices = X;
 		mesh.RecalculateNormals();
+	}
+
+	Quaternion quaternionAdd(Quaternion q1, Quaternion q2) {
+		Quaternion q = Quaternion.identity;
+		q.x = q1.x + q2.x;
+		q.y = q1.y + q2.y;
+		q.z = q1.z + q2.z;
+		q.w = q1.w + q2.w;
+
+		return q;
 	}
 }
