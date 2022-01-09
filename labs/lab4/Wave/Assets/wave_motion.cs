@@ -18,7 +18,7 @@ public class wave_motion : MonoBehaviour
 	float[,]	cg_Ap;
 	bool 	tag=true;
 
-	float dt = 0.003f;
+	float dt = 0.005f;
 
 	Vector3 	cube_v1 = Vector3.zero;
 	Vector3 	cube_v2 = Vector3.zero;
